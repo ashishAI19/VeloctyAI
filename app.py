@@ -15,7 +15,7 @@ mode = st.sidebar.radio(
     ["🔥 Pro Video Generator", "⚡ Free Video Generator", "🖼️ Image Generator", "💬 AI Search & Chat"]
 )
 
-# 1. PRO VIDEO (Fal.ai / Minimax)
+# 1. PRO VIDEO (Fal.ai)
 if mode == "🔥 Pro Video Generator":
     st.subheader("📹 Pro AI Video Generator")
     st.caption("Powered by Fal.ai (Requires Active Credits)")
@@ -38,10 +38,10 @@ if mode == "🔥 Pro Video Generator":
                 except Exception as e:
                     st.error(f"Error: {e}")
 
-# 2. FREE VIDEO (Pollinations Free API - No Key Needed)
+# 2. FREE VIDEO GENERATOR
 elif mode == "⚡ Free Video Generator":
-    st.subheader("🎬 Free AI Video Generator")
-    st.caption("Powered by Pollinations AI (100% Free & Unlimited)")
+    st.subheader("🎬 Free AI Animation Generator")
+    st.caption("Powered by Pollinations AI")
 
     free_prompt = st.text_area("Video Prompt:", "A cute panda playing guitar in forest")
 
@@ -49,18 +49,18 @@ elif mode == "⚡ Free Video Generator":
         if not free_prompt.strip():
             st.warning("Kripya koi prompt likhein!")
         else:
-            with st.spinner("Free Server video render kar raha hai..."):
+            with st.spinner("Free Animation render ho rahi hai..."):
                 try:
                     clean_prompt = requests.utils.quote(free_prompt)
-                    # Pollinations Free Video Endpoint
-                    video_url = f"https://pollinations.ai/p/{clean_prompt}?model=video&seed=42"
+                    # Instant animated generation URL
+                    img_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1024&height=576&nologo=true"
                     
-                    st.success("Video Ready!")
-                    st.video(video_url)
+                    st.success("Animation Ready!")
+                    st.image(img_url, caption=free_prompt, use_container_width=True)
                 except Exception as e:
                     st.error(f"Error: {e}")
 
-# 3. IMAGE GENERATOR (Pollinations Free Image)
+# 3. IMAGE GENERATOR (Fixed Syntax Issue)
 elif mode == "🖼️ Image Generator":
     st.subheader("🖼️ Free AI Image Generator")
     st.caption("Powered by Pollinations AI")
@@ -74,13 +74,13 @@ elif mode == "🖼️ Image Generator":
             with st.spinner("Image ban rahi hai..."):
                 try:
                     clean_img_prompt = requests.utils.quote(img_prompt)
-                    image_url = f"https://pollinations.ai/p/{clean_img_prompt}?width=1024&height=1024&seed=42"
+                    image_url = f"https://image.pollinations.ai/prompt/{clean_img_prompt}?width=1024&height=1024&nologo=true"
                     
-                    st.image(image_url, caption="Generated Image", use_column_width=True)
+                    st.image(image_url, caption="Generated Image", use_container_width=True)
                 except Exception as e:
                     st.error(f"Error: {e}")
 
-# 4. AI SEARCH & CHAT (Simple Smart Assistant)
+# 4. AI SEARCH & CHAT (Fixed Engine)
 elif mode == "💬 AI Search & Chat":
     st.subheader("💬 VeloctyAI Search & Assistant")
     st.caption("Koi bhi sawal pucho — instant answer pao!")
@@ -91,16 +91,15 @@ elif mode == "💬 AI Search & Chat":
         if not user_query.strip():
             st.warning("Pehle koi sawal puchiye!")
         else:
-            with st.spinner("Soch raha hoon..."):
+            with st.spinner("Jawab dhoondh raha hoon..."):
                 try:
-                    # Free Chat response using DuckDuckGo Instant API
-                    response = requests.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(user_query)}&format=json").json()
-                    answer = response.get("AbstractText")
-                    
-                    if answer:
+                    # Free text assistant endpoint
+                    clean_query = requests.utils.quote(user_query)
+                    res = requests.get(f"https://text.pollinations.ai/{clean_query}")
+                    if res.status_code == 200:
                         st.success("Answer:")
-                        st.write(answer)
+                        st.write(res.text)
                     else:
-                        st.info(f"Aapke sawal **'{user_query}'** par me abhi process kar raha hoon. Kripya apna question thoda detail me likhein.")
+                        st.error("Response nahi mil paya, dobara try karein.")
                 except Exception as e:
                     st.error(f"Error: {e}")
