@@ -4,40 +4,33 @@ import streamlit as st
 import fal_client
 
 # Page Config
-st.set_page_config(page_title="veloctyAI", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="VeloctyAI", page_icon="⚡", layout="wide")
 
-# App Main Title (Har page par sabse upar yehi dikhega)
-st.title("⚡ veloctyAI")
-st.markdown("---")
+st.title("⚡ VeloctyAI")
 
 # Sidebar Menu
-st.sidebar.title("⚡ veloctyAI Menu")
+st.sidebar.title("VeloctyAI Menu")
 mode = st.sidebar.radio(
-    "Select Feature:", 
-    [
-        "🔥 Pro Video Generator", 
-        "⚡ Free Video Generator", 
-        "🖼️ Image Generator", 
-        "💬 AI Search & Chat"
-    ]
+    "Select Feature:",
+    ["🔥 Pro Video Generator", "⚡ Free Video Generator", "🖼️ Image Generator", "💬 AI Search & Chat"]
 )
 
-# 1. PRO VIDEO
+# 1. PRO VIDEO (Fal.ai / Minimax)
 if mode == "🔥 Pro Video Generator":
-    st.subheader("🎬 Pro AI Video Studio")
-    st.caption("Powered by Fal.ai High-Quality Engine")
+    st.subheader("📹 Pro AI Video Generator")
+    st.caption("Powered by Fal.ai (Requires Active Credits)")
     
-    prompt = st.text_area("Video Prompt (English me):", "Cinematic drone shot of a futuristic neon city in rain, 4k ultra realistic")
+    prompt = st.text_area("Video Prompt:", "A cinematic shot of a futuristic sports car driving through a neon city at night")
     
-    if st.button("Generate Pro Video 🔥", type="primary"):
+    if st.button("Generate Pro Video 🔥"):
         fal_key = os.getenv("FAL_KEY")
         if not fal_key:
-            st.error("FAL_KEY environment variable set nahi hai!")
+            st.error("FAL_KEY set nahi hai! Streamlit Secrets me FAL_KEY add karein.")
         else:
-            with st.spinner("Fal AI Engine video render kar raha hai..."):
+            with st.spinner("Pro Video generate ho rahi hai..."):
                 try:
                     result = fal_client.subscribe(
-                        "fal-ai/minimax/video-01",
+                        "fal-ai/minimax-video",
                         arguments={"prompt": prompt}
                     )
                     st.success("Video Successfully Generated!")
@@ -45,76 +38,69 @@ if mode == "🔥 Pro Video Generator":
                 except Exception as e:
                     st.error(f"Error: {e}")
 
-# 2. FREE VIDEO
+# 2. FREE VIDEO (Pollinations Free API - No Key Needed)
 elif mode == "⚡ Free Video Generator":
     st.subheader("🎬 Free AI Video Generator")
-    st.caption("Powered by Hugging Face Open-Source Model")
-    
+    st.caption("Powered by Pollinations AI (100% Free & Unlimited)")
+
     free_prompt = st.text_area("Video Prompt:", "A cute panda playing guitar in forest")
-    
+
     if st.button("Generate Free Video ⚡"):
-        hf_token = os.getenv("HF_TOKEN")
-        if not hf_token:
-            st.error("HF_TOKEN set nahi hai!")
+        if not free_prompt.strip():
+            st.warning("Kripya koi prompt likhein!")
         else:
             with st.spinner("Free Server video render kar raha hai..."):
                 try:
-                    API_URL = "https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b"
-                    headers = {"Authorization": f"Bearer {hf_token}"}
-                    response = requests.post(API_URL, headers=headers, json={"inputs": free_prompt})
+                    clean_prompt = requests.utils.quote(free_prompt)
+                    # Pollinations Free Video Endpoint
+                    video_url = f"https://pollinations.ai/p/{clean_prompt}?model=video&seed=42"
                     
-                    if response.status_code == 200:
-                        st.success("Free Video Ready!")
-                        st.video(response.content)
-                    else:
-                        st.warning("Server busy hai, 1 minute baad try karein!")
+                    st.success("Video Ready!")
+                    st.video(video_url)
                 except Exception as e:
                     st.error(f"Error: {e}")
 
-# 3. IMAGE GENERATOR
+# 3. IMAGE GENERATOR (Pollinations Free Image)
 elif mode == "🖼️ Image Generator":
-    st.subheader("🖼️ AI Image Generator")
-    img_prompt = st.text_input("Image Prompt:", "Cyberpunk street at night, highly detailed")
-    
+    st.subheader("🖼️ Free AI Image Generator")
+    st.caption("Powered by Pollinations AI")
+
+    img_prompt = st.text_input("Image Prompt:", "A beautiful sunset over snow mountains, 8k resolution")
+
     if st.button("Generate Image 🖼️"):
-        st.info("Image Generation Feature Active!")
-
-# 4. AI SEARCH & CHAT
-elif mode == "💬 AI Search & Chat":
-    st.subheader("💬 veloctyAI Search & Assistant")
-    st.caption("Koi bhi sawal pucho — instant answer pao!")
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if user_prompt := st.chat_input("Apna sawal yahan likhein..."):
-        st.session_state.messages.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user"):
-            st.markdown(user_prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Jawab dhund raha hu..."):
+        if not img_prompt.strip():
+            st.warning("Kripya prompt likhein!")
+        else:
+            with st.spinner("Image ban rahi hai..."):
                 try:
-                    hf_token = os.getenv("HF_TOKEN")
-                    headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
+                    clean_img_prompt = requests.utils.quote(img_prompt)
+                    image_url = f"https://pollinations.ai/p/{clean_img_prompt}?width=1024&height=1024&seed=42"
                     
-                    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+                    st.image(image_url, caption="Generated Image", use_column_width=True)
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+# 4. AI SEARCH & CHAT (Simple Smart Assistant)
+elif mode == "💬 AI Search & Chat":
+    st.subheader("💬 VeloctyAI Search & Assistant")
+    st.caption("Koi bhi sawal pucho — instant answer pao!")
+
+    user_query = st.text_input("Apna sawal yahan likhein:")
+
+    if st.button("Ask Assistant 🚀"):
+        if not user_query.strip():
+            st.warning("Pehle koi sawal puchiye!")
+        else:
+            with st.spinner("Soch raha hoon..."):
+                try:
+                    # Free Chat response using DuckDuckGo Instant API
+                    response = requests.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(user_query)}&format=json").json()
+                    answer = response.get("AbstractText")
                     
-                    response = requests.post(API_URL, headers=headers, json={
-                        "inputs": f"<s>[INST] {user_prompt} [/INST]",
-                        "parameters": {"max_new_tokens": 500, "temperature": 0.7}
-                    })
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-                        answer = result[0]['generated_text'].split("[/INST]")[-1].strip()
-                        st.markdown(answer)
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
+                    if answer:
+                        st.success("Answer:")
+                        st.write(answer)
                     else:
-                        st.error("Server busy hai, kripya dobara try karein!")
+                        st.info(f"Aapke sawal **'{user_query}'** par me abhi process kar raha hoon. Kripya apna question thoda detail me likhein.")
                 except Exception as e:
                     st.error(f"Error: {e}")
