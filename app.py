@@ -1,148 +1,107 @@
-import os
-import io
-import requests
+# Save this as app.py
 import streamlit as st
+from huggingface_hub import InferenceClient
+import google.generativeai as genai
 from PIL import Image
+import io
+import time
 
-# Page Configuration
-st.set_page_config(page_title="VeloctyAI", page_icon="⚡", layout="wide")
-st.title("⚡ VeloctyAI")
+# --- Streamlit Page Config ---
+st.set_page_config(page_title="VeloctyAI - Dynamic UI Chatbot", layout="wide")
 
-# Sidebar Navigation
-st.sidebar.title("VeloctyAI Menu")
-mode = st.sidebar.radio(
-    "Select Feature:",
-    [
-        "💬 Fast AI Search & Chat",
-        "✨ AI Style Transform & Edit",
-        "🖼️ Free AI Image Generator",
-        "🎬 Free AI Video"
-    ]
-)
+# --- Initialize Session States ---
+if 'api_keys_set' not in st.session_state:
+    st.session_state['api_keys_set'] = False
+if 'generated_image' not in st.session_state:
+    st.session_state['generated_image'] = None
 
-# 1. AI CHAT
-if mode == "💬 Fast AI Search & Chat":
-    st.subheader("💬 VeloctyAI UltraFast Assistant")
-    st.caption("Hindi ya English me sawal likhein — instant answer paayein!")
-
-    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-
-    with st.form("chat_form"):
-        user_query = st.text_input("Apna sawal likhein:")
-        submit_chat = st.form_submit_button("Ask Assistant 🚀")
-
-    if submit_chat and user_query:
-        if not gemini_key:
-            st.error("GEMINI_API_KEY set nahi hai! Streamlit Secrets me key add karein.")
-        else:
-            with st.spinner("Jawab aa raha hai..."):
-                try:
-                    import google.generativeai as genai
-                    genai.configure(api_key=gemini_key)
-                    model = genai.GenerativeModel("gemini-3.6-flash")
-                    response = model.generate_content(user_query)
-                    st.success("Answer:")
-                    st.write(response.text)
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-# 2. PHOTO TRANSFORM + PROMPT EDIT + DOWNLOAD
-elif mode == "✨ AI Style Transform & Edit":
-    st.subheader("✨ Custom Photo Editor & Transformer")
-    st.caption("Apni photo upload karein, apna prompt likhein aur edit karke download karein!")
-
-    uploaded_file = st.file_uploader("Apni photo select karein (JPG/PNG):", type=["jpg", "png", "jpeg"])
-
-    if uploaded_file is not None:
-        st.image(uploaded_file, caption="Uploaded Photo", use_container_width=True)
+# --- Function to Set Keys from Secrets ---
+def set_keys():
+    try:
+        if "GEMINI_API_KEY" not in st.secrets or "HF_TOKEN" not in st.secrets:
+            st.error("⚠️ Environment secrets are missing! Please add 'GEMINI_API_KEY' and 'HF_TOKEN' to Streamlit Secrets.")
+            return False
         
-        user_prompt = st.text_input(
-            "AI ko kya instruct karna hai? (Prompt Type Karein):",
-            value="Studio Ghibli anime style, cinematic lighting, masterpiece, 8k high quality"
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        st.session_state['hf_client'] = InferenceClient(
+            token=st.secrets["HF_TOKEN"],
+            timeout=30 # Add a timeout for safety
         )
+        st.session_state['api_keys_set'] = True
+        return True
+    except Exception as e:
+        st.error(f"❌ Critical error configuring API keys: {str(e)}")
+        return False
 
-        if st.button("Transform & Enhance Photo 🚀"):
-            hf_token = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
+# --- Core Image Generation Function (Strictly Hugging Face) ---
+def generate_fresh_image(prompt, retries=2):
+    if not st.session_state['api_keys_set']:
+        return None, "System setup is incomplete."
 
-            if not hf_token:
-                st.error("HF_TOKEN set nahi hai! Streamlit Secrets me token add karein.")
+    final_prompt = f"Professional, ultra-detailed image of {prompt}. Cinematic lighting, 8k, photorealistic style."
+    
+    # Use a robust, reliable HF model
+    model_id = "runwayml/stable-diffusion-v1-5" 
+
+    for attempt in range(retries):
+        try:
+            with st.spinner("🚀 Generating your image on Hugging Face servers..."):
+                response_content = st.session_state['hf_client'].post(
+                    json={"inputs": final_prompt, "options": {"wait_for_model": True}},
+                    model=model_id
+                )
+                image_data = response_content.read()
+                
+                if image_data:
+                    image_obj = Image.open(io.BytesIO(image_data))
+                    return image_obj, None
+                else:
+                    return None, "Model returned no data."
+
+        except Exception as e:
+            time.sleep(2) # Short pause before retry
+            error_msg = f"Hugging Face server error: {str(e)}"
+            
+    return None, f"After {retries} attempts, generation failed. {error_msg}"
+
+# --- Set keys before rendering anything else ---
+keys_configured = set_keys()
+
+# --- Main UI ---
+st.title("🤖 VeloctyAI - Visual Assistant")
+
+# --- Column Layout for Better View ---
+col_in, col_out = st.columns([1.5, 1])
+
+with col_in:
+    st.subheader("Input & Control")
+    user_input = st.text_input("AI ko kya instruct karna hai? (Detailed Prompt likhein):", placeholder="Example: create a cartoon version of this photo...")
+    
+    # Simple image generation button, independent of previous context
+    generate_btn = st.button("Generate Image 🚀", use_container_width=True)
+
+with col_out:
+    st.subheader("Output Result")
+    result_container = st.empty()
+    error_container = st.empty()
+
+    if generate_btn and user_input:
+        if keys_configured:
+            generated_img, error_msg = generate_fresh_image(user_input)
+            
+            if generated_img:
+                result_container.image(generated_img, caption="AI Generated Image", use_container_width=True)
+                st.session_state['generated_image'] = generated_img
             else:
-                with st.spinner("AI photo ko process kar raha hai..."):
-                    try:
-                        from huggingface_hub import InferenceClient
-                        client = InferenceClient(api_key=hf_token)
-                        input_img = Image.open(uploaded_file)
+                error_container.error(error_msg)
+        else:
+            st.warning("⚠️ Please configure your API keys first.")
 
-                        # Hugging Face image-to-image pipeline
-                        output_image = client.image_to_image(
-                            model="stabilityai/stable-diffusion-xl-refiner-1.0",
-                            image=input_img,
-                            prompt=f"{user_prompt}, sharp focus, highly detailed, best quality",
-                            negative_prompt="blurry, distorted, ugly, low quality"
-                        )
-
-                        st.success("Photo Edited Successfully!")
-                        st.image(output_image, caption="AI Result", use_container_width=True)
-
-                        # Download button buffer
-                        buf = io.BytesIO()
-                        output_image.save(buf, format="PNG")
-                        byte_im = buf.getvalue()
-
-                        st.download_button(
-                            label="📥 Download HD Photo",
-                            data=byte_im,
-                            file_name="VeloctyAI_Edited_Photo.png",
-                            mime="image/png"
-                        )
-
-                    except Exception as e:
-                        # Fallback Engine (Free Server)
-                        st.warning("HF Server busy/loading, Pollinations engine se generate kar rahe hain...")
-                        clean_prompt = requests.utils.quote(user_prompt)
-                        fallback_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1024&height=1024&nologo=true"
-                        
-                        st.image(fallback_url, caption="AI Generated Concept", use_container_width=True)
-                        img_data = requests.get(fallback_url).content
-                        
-                        st.download_button(
-                            label="📥 Download HD Photo",
-                            data=img_data,
-                            file_name="VeloctyAI_Edited_Photo.png",
-                            mime="image/png"
-                        )
-
-# 3. FREE AI IMAGE
-elif mode == "🖼️ Free AI Image Generator":
-    st.subheader("🖼️ Unlimited Free AI Image Generator")
-    
-    with st.form("image_form"):
-        img_prompt = st.text_input("Image Prompt:", "A futuristic computer setup, neon light, 8k")
-        submit_img = st.form_submit_button("Generate Image 🖼️")
-
-    if submit_img and img_prompt:
-        with st.spinner("Image ban rahi hai..."):
-            try:
-                clean_img_prompt = requests.utils.quote(img_prompt)
-                image_url = f"https://image.pollinations.ai/prompt/{clean_img_prompt}?width=1024&height=1024&nologo=true"
-                st.image(image_url, caption=f"Result for: {img_prompt}", use_container_width=True)
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-# 4. FREE AI VIDEO
-elif mode == "🎬 Free AI Video":
-    st.subheader("🎬 Free AI Video Generator")
-    
-    with st.form("video_form"):
-        video_prompt = st.text_area("Video Prompt:", "A cute panda playing guitar in forest")
-        submit_video = st.form_submit_button("Generate Video ⚡")
-
-    if submit_video and video_prompt:
-        with st.spinner("Video render ho rahi hai..."):
-            try:
-                clean_prompt = requests.utils.quote(video_prompt)
-                video_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1024&height=576&nologo=true"
-                st.success("Video Ready!")
-                st.image(video_url, caption=video_prompt, use_container_width=True)
-            except Exception as e:
-                st.error(f"Error: {e}")
+# --- Footer with Status ---
+if not keys_configured:
+    st.markdown("---")
+    st.warning("⚠️ Application is NOT fully functional. Please add your API keys (GEMINI_API_KEY and HF_TOKEN) to Streamlit Secrets.")
+else:
+    # Small status indicator
+    st.markdown("---")
+    st.caption("✔️ System is online using Hugging Face servers.")
