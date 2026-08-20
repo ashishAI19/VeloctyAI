@@ -14,7 +14,7 @@ mode = st.sidebar.radio(
     ["🎬 Free AI Video", "🖼️ Free AI Image", "💬 AI Search & Chat"]
 )
 
-# 1. FREE AI VIDEO / ANIMATION
+# 1.  ANIMATION
 if mode == "🎬 Free AI Video":
     st.subheader("🎬 Free AI Video Generator")
     st.caption("Powered by Free Open-Source Engine")
@@ -34,7 +34,7 @@ if mode == "🎬 Free AI Video":
             except Exception as e:
                 st.error(f"Error: {e}")
 
-# 2. FREE AI IMAGE GENERATOR
+# 2.  AI IMAGE GENERATOR
 elif mode == "🖼️ Free AI Image":
     st.subheader("🖼️ Free AI Image Generator")
     st.caption("100% Unlimited Free Generation")
@@ -53,27 +53,30 @@ elif mode == "🖼️ Free AI Image":
             except Exception as e:
                 st.error(f"Error: {e}")
 
-# 3. AI SEARCH & CHAT (Instant Free Response)
+# 3. AI SEARCH & CHAT (Superfast Gemini API)
 elif mode == "💬 AI Search & Chat":
     st.subheader("💬 VeloctyAI Instant Assistant")
-    st.caption("Koi bhi sawal likhein aur Enter dabayein")
+    st.caption("Google Gemini Powered — Instant Answers")
     
     with st.form("chat_form"):
         user_query = st.text_input("Apna sawal likhein:")
         submit_chat = st.form_submit_button("Ask Assistant 🚀")
 
     if submit_chat and user_query:
-        with st.spinner("Jawab dhoondh raha hoon..."):
-            try:
-                clean_query = requests.utils.quote(user_query)
-                # Free Text Response Endpoint
-                url = f"https://text.pollinations.ai/{clean_query}"
-                res = requests.get(url)
-                
-                if res.status_code == 200:
+        # Streamlit Secrets se key le raha hai
+        gemini_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+        
+        if not gemini_key:
+            st.error("GEMINI_API_KEY set nahi hai! Streamlit Secrets me key add karein.")
+        else:
+            with st.spinner("Instant jawab aa raha hai..."):
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=gemini_key)
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    
+                    response = model.generate_content(user_query)
                     st.success("Answer:")
-                    st.write(res.text)
-                else:
-                    st.error("Server busy hai, dobara try karein.")
-            except Exception as e:
-                st.error(f"Error: {e}")
+                    st.write(response.text)
+                except Exception as e:
+                    st.error(f"Error: {e}")
