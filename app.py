@@ -47,14 +47,14 @@ if mode == "💬 Fast AI Search & Chat":
                     st.write(response.text)
 
                     # 2. Browser Web Speech API (Auto-speak without gTTS)
-                    clean_text = response.text.replace('"', "'").replace('\n', ' ')
-                    js_speech = f"""
-                        <script>
-                            var msg = new SpeechSynthesisUtterance("{clean_text}");
-                            msg.lang = "hi-IN";
-                            window.speechSynthesis.speak(msg);
-                        </script>
-                    """
+                    clean_text = response.text.replace('**', '').replace('*', '').replace('#', '').replace('"', "'").replace('\n', ' ')
+      js_speech = f"""
+    <script>
+        var msg = new SpeechSynthesisUtterance("{clean_text}");
+        msg.lang = "hi-IN";
+        window.speechSynthesis.speak(msg);
+    </script>
+"""
                     st.components.v1.html(js_speech, height=0)
 
                 except Exception as e:
