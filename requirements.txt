@@ -3,5 +3,3 @@ requests
 Pillow
 google-generativeai
 huggingface_hub
-gTTS
-streamlit-mic-recorder
