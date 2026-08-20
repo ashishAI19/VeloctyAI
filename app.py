@@ -39,7 +39,7 @@ if mode == "💬 Fast AI Search & Chat":
                 try:
                     import google.generativeai as genai
                     genai.configure(api_key=gemini_key)
-                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-3.6-flash")
                     response = model.generate_content(user_query)
                     
                     # 1. Text Jawab
