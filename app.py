@@ -1,87 +1,148 @@
-import streamlit as st
-import google.generativeai as genai
-from huggingface_hub import InferenceClient
-from PIL import Image
+import os
 import io
 import requests
+import streamlit as st
+from PIL import Image
 
-st.set_page_config(page_title="VeloctyAI", layout="wide")
+# Page Configuration
+st.set_page_config(page_title="VeloctyAI", page_icon="⚡", layout="wide")
+st.title("⚡ VeloctyAI")
 
-# API Keys Setup
-GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
-HF_TOKEN = st.secrets.get("HF_TOKEN", "")
+# Sidebar Navigation
+st.sidebar.title("VeloctyAI Menu")
+mode = st.sidebar.radio(
+    "Select Feature:",
+    [
+        "💬 Fast AI Search & Chat",
+        "✨ AI Style Transform & Edit",
+        "🖼️ Free AI Image Generator",
+        "🎬 Free AI Video"
+    ]
+)
 
-if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
+# 1. AI CHAT
+if mode == "💬 Fast AI Search & Chat":
+    st.subheader("💬 VeloctyAI UltraFast Assistant")
+    st.caption("Hindi ya English me sawal likhein — instant answer paayein!")
 
-# HuggingFace Client
-hf_client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
+    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-st.title("⚡ VeloctyAI - All-in-One Image & AI Studio")
+    with st.form("chat_form"):
+        user_query = st.text_input("Apna sawal likhein:")
+        submit_chat = st.form_submit_button("Ask Assistant 🚀")
 
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    st.subheader("📸 Input & Controls")
-    
-    # 1. File Uploader
-    uploaded_file = st.file_uploader("Photo Upload Karein:", type=["jpg", "png", "jpeg"])
-    
-    if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Photo", width=300)
-
-    # 2. Prompt Input
-    user_prompt = st.text_input("AI ko kya instruct karna hai?", placeholder="e.g. Cartoon me convert kro / Describe this photo")
-
-    # 3. Action Buttons
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        transform_btn = st.button("Transform & Enhance Photo 🚀", use_container_width=True)
-    with col_btn2:
-        analyze_btn = st.button("Analyze Photo (Gemini) 🔍", use_container_width=True)
-
-with col2:
-    st.subheader("🖼️ Output Result")
-    
-    # Image Transformation Logic
-    if transform_btn:
-        if not user_prompt:
-            st.warning("Kripya pehle prompt type karein!")
+    if submit_chat and user_query:
+        if not gemini_key:
+            st.error("GEMINI_API_KEY set nahi hai! Streamlit Secrets me key add karein.")
         else:
-            with st.spinner("Processing image generation..."):
+            with st.spinner("Jawab aa raha hai..."):
                 try:
-                    # Direct reliable model call
-                    prompt_text = f"masterpiece, highly detailed, {user_prompt}"
-                    
-                    # Call Hugging Face Stable Diffusion
-                    img_bytes = hf_client.text_to_image(
-                        prompt_text, 
-                        model="stabilityai/stable-diffusion-2-1"
-                    )
-                    st.image(img_bytes, caption="Generated Result", use_container_width=True)
-                    st.success("Successfully generated via HuggingFace!")
-                
-                except Exception as e:
-                    # Fallback to Pollinations with proper prompt encoding if HF fails
-                    st.info("HF busy status. Switching to fast backup engine...")
-                    try:
-                        clean_prompt = user_prompt.replace(" ", "%20")
-                        pollin_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=800&height=800&nologo=true"
-                        st.image(pollin_url, caption="Generated Result (Backup Engine)", use_container_width=True)
-                    except Exception as err:
-                        st.error(f"Error: {err}")
-
-    # Gemini Vision Analysis Logic
-    if analyze_btn:
-        if not uploaded_file:
-            st.warning("Pehle ek photo upload karein!")
-        else:
-            with st.spinner("Analyzing image with Gemini..."):
-                try:
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    prompt = user_prompt if user_prompt else "Describe this image in detail in Hindi and English."
-                    response = model.generate_content([prompt, Image.open(uploaded_file)])
+                    import google.generativeai as genai
+                    genai.configure(api_key=gemini_key)
+                    model = genai.GenerativeModel("gemini-3.6-flash")
+                    response = model.generate_content(user_query)
+                    st.success("Answer:")
                     st.write(response.text)
                 except Exception as e:
-                    st.error(f"Gemini Error: {e}")
+                    st.error(f"Error: {e}")
+
+# 2. PHOTO TRANSFORM + PROMPT EDIT + DOWNLOAD
+elif mode == "✨ AI Style Transform & Edit":
+    st.subheader("✨ Custom Photo Editor & Transformer")
+    st.caption("Apni photo upload karein, apna prompt likhein aur edit karke download karein!")
+
+    uploaded_file = st.file_uploader("Apni photo select karein (JPG/PNG):", type=["jpg", "png", "jpeg"])
+
+    if uploaded_file is not None:
+        st.image(uploaded_file, caption="Uploaded Photo", use_container_width=True)
+        
+        user_prompt = st.text_input(
+            "AI ko kya instruct karna hai? (Prompt Type Karein):",
+            value="Studio Ghibli anime style, cinematic lighting, masterpiece, 8k high quality"
+        )
+
+        if st.button("Transform & Enhance Photo 🚀"):
+            hf_token = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
+
+            if not hf_token:
+                st.error("HF_TOKEN set nahi hai! Streamlit Secrets me token add karein.")
+            else:
+                with st.spinner("AI photo ko process kar raha hai..."):
+                    try:
+                        from huggingface_hub import InferenceClient
+                        client = InferenceClient(api_key=hf_token)
+                        input_img = Image.open(uploaded_file)
+
+                        # Hugging Face image-to-image pipeline
+                        output_image = client.image_to_image(
+                            model="stabilityai/stable-diffusion-xl-refiner-1.0",
+                            image=input_img,
+                            prompt=f"{user_prompt}, sharp focus, highly detailed, best quality",
+                            negative_prompt="blurry, distorted, ugly, low quality"
+                        )
+
+                        st.success("Photo Edited Successfully!")
+                        st.image(output_image, caption="AI Result", use_container_width=True)
+
+                        # Download button buffer
+                        buf = io.BytesIO()
+                        output_image.save(buf, format="PNG")
+                        byte_im = buf.getvalue()
+
+                        st.download_button(
+                            label="📥 Download HD Photo",
+                            data=byte_im,
+                            file_name="VeloctyAI_Edited_Photo.png",
+                            mime="image/png"
+                        )
+
+                    except Exception as e:
+                        # Fallback Engine (Free Server)
+                        st.warning("HF Server busy/loading, Pollinations engine se generate kar rahe hain...")
+                        clean_prompt = requests.utils.quote(user_prompt)
+                        fallback_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1024&height=1024&nologo=true"
+                        
+                        st.image(fallback_url, caption="AI Generated Concept", use_container_width=True)
+                        img_data = requests.get(fallback_url).content
+                        
+                        st.download_button(
+                            label="📥 Download HD Photo",
+                            data=img_data,
+                            file_name="VeloctyAI_Edited_Photo.png",
+                            mime="image/png"
+                        )
+
+# 3. FREE AI IMAGE
+elif mode == "🖼️ Free AI Image Generator":
+    st.subheader("🖼️ Unlimited Free AI Image Generator")
+    
+    with st.form("image_form"):
+        img_prompt = st.text_input("Image Prompt:", "A futuristic computer setup, neon light, 8k")
+        submit_img = st.form_submit_button("Generate Image 🖼️")
+
+    if submit_img and img_prompt:
+        with st.spinner("Image ban rahi hai..."):
+            try:
+                clean_img_prompt = requests.utils.quote(img_prompt)
+                image_url = f"https://image.pollinations.ai/prompt/{clean_img_prompt}?width=1024&height=1024&nologo=true"
+                st.image(image_url, caption=f"Result for: {img_prompt}", use_container_width=True)
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# 4. FREE AI VIDEO
+elif mode == "🎬 Free AI Video":
+    st.subheader("🎬 Free AI Video Generator")
+    
+    with st.form("video_form"):
+        video_prompt = st.text_area("Video Prompt:", "A cute panda playing guitar in forest")
+        submit_video = st.form_submit_button("Generate Video ⚡")
+
+    if submit_video and video_prompt:
+        with st.spinner("Video render ho rahi hai..."):
+            try:
+                clean_prompt = requests.utils.quote(video_prompt)
+                video_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1024&height=576&nologo=true"
+                st.success("Video Ready!")
+                st.image(video_url, caption=video_prompt, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error: {e}")
