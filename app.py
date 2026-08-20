@@ -21,10 +21,11 @@ mode = st.sidebar.radio(
         "🎬 Free AI Video"
     ]
 )
-# 1. AI CHAT WITH BROWSER NATIVE VOICE (NO HEAVY LIBRARIES NEEDED)
+# 1. AI CHAT WITH AUTO-VOICE (CLEAN)
 if mode == "💬 Fast AI Search & Chat":
-    st.subheader("💬 VeloctyAI Assistant")
-    
+    st.subheader("💬 VeloctyAI UltraFast Assistant")
+    st.caption("Hindi ya English me sawal likhein — instant answer paayein!")
+
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
     with st.form("chat_form"):
@@ -33,28 +34,28 @@ if mode == "💬 Fast AI Search & Chat":
 
     if submit_chat and user_query:
         if not gemini_key:
-            st.error("GEMINI_API_KEY set nahi hai!")
+            st.error("GEMINI_API_KEY set nahi hai! Streamlit Secrets me key add karein.")
         else:
             with st.spinner("Jawab aa raha hai..."):
                 try:
                     import google.generativeai as genai
                     genai.configure(api_key=gemini_key)
-                    model = genai.GenerativeModel("gemini-3.6-flash")
+                    model = genai.GenerativeModel("gemini-1.5-flash")
                     response = model.generate_content(user_query)
                     
-                    # 1. Text Jawab
                     st.success("Answer:")
                     st.write(response.text)
 
-                    # 2. Browser Web Speech API (Auto-speak without gTTS)
+                    # Text cleanup (Taaki taraankan na bole aur indentation error na aaye)
                     clean_text = response.text.replace('**', '').replace('*', '').replace('#', '').replace('"', "'").replace('\n', ' ')
-      js_speech = f"""
-    <script>
-        var msg = new SpeechSynthesisUtterance("{clean_text}");
-        msg.lang = "hi-IN";
-        window.speechSynthesis.speak(msg);
-    </script>
-"""
+                    
+                    js_speech = f"""
+                    <script>
+                        var msg = new SpeechSynthesisUtterance("{clean_text}");
+                        msg.lang = "hi-IN";
+                        window.speechSynthesis.speak(msg);
+                    </script>
+                    """
                     st.components.v1.html(js_speech, height=0)
 
                 except Exception as e:
