@@ -1,107 +1,87 @@
-# Save this as app.py
 import streamlit as st
-from huggingface_hub import InferenceClient
 import google.generativeai as genai
+from huggingface_hub import InferenceClient
 from PIL import Image
 import io
-import time
+import requests
 
-# --- Streamlit Page Config ---
-st.set_page_config(page_title="VeloctyAI - Dynamic UI Chatbot", layout="wide")
+st.set_page_config(page_title="VeloctyAI", layout="wide")
 
-# --- Initialize Session States ---
-if 'api_keys_set' not in st.session_state:
-    st.session_state['api_keys_set'] = False
-if 'generated_image' not in st.session_state:
-    st.session_state['generated_image'] = None
+# API Keys Setup
+GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
+HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-# --- Function to Set Keys from Secrets ---
-def set_keys():
-    try:
-        if "GEMINI_API_KEY" not in st.secrets or "HF_TOKEN" not in st.secrets:
-            st.error("⚠️ Environment secrets are missing! Please add 'GEMINI_API_KEY' and 'HF_TOKEN' to Streamlit Secrets.")
-            return False
-        
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        st.session_state['hf_client'] = InferenceClient(
-            token=st.secrets["HF_TOKEN"],
-            timeout=30 # Add a timeout for safety
-        )
-        st.session_state['api_keys_set'] = True
-        return True
-    except Exception as e:
-        st.error(f"❌ Critical error configuring API keys: {str(e)}")
-        return False
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
 
-# --- Core Image Generation Function (Strictly Hugging Face) ---
-def generate_fresh_image(prompt, retries=2):
-    if not st.session_state['api_keys_set']:
-        return None, "System setup is incomplete."
+# HuggingFace Client
+hf_client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
 
-    final_prompt = f"Professional, ultra-detailed image of {prompt}. Cinematic lighting, 8k, photorealistic style."
+st.title("⚡ VeloctyAI - All-in-One Image & AI Studio")
+
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.subheader("📸 Input & Controls")
     
-    # Use a robust, reliable HF model
-    model_id = "runwayml/stable-diffusion-v1-5" 
-
-    for attempt in range(retries):
-        try:
-            with st.spinner("🚀 Generating your image on Hugging Face servers..."):
-                response_content = st.session_state['hf_client'].post(
-                    json={"inputs": final_prompt, "options": {"wait_for_model": True}},
-                    model=model_id
-                )
-                image_data = response_content.read()
-                
-                if image_data:
-                    image_obj = Image.open(io.BytesIO(image_data))
-                    return image_obj, None
-                else:
-                    return None, "Model returned no data."
-
-        except Exception as e:
-            time.sleep(2) # Short pause before retry
-            error_msg = f"Hugging Face server error: {str(e)}"
-            
-    return None, f"After {retries} attempts, generation failed. {error_msg}"
-
-# --- Set keys before rendering anything else ---
-keys_configured = set_keys()
-
-# --- Main UI ---
-st.title("🤖 VeloctyAI - Visual Assistant")
-
-# --- Column Layout for Better View ---
-col_in, col_out = st.columns([1.5, 1])
-
-with col_in:
-    st.subheader("Input & Control")
-    user_input = st.text_input("AI ko kya instruct karna hai? (Detailed Prompt likhein):", placeholder="Example: create a cartoon version of this photo...")
+    # 1. File Uploader
+    uploaded_file = st.file_uploader("Photo Upload Karein:", type=["jpg", "png", "jpeg"])
     
-    # Simple image generation button, independent of previous context
-    generate_btn = st.button("Generate Image 🚀", use_container_width=True)
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Photo", width=300)
 
-with col_out:
-    st.subheader("Output Result")
-    result_container = st.empty()
-    error_container = st.empty()
+    # 2. Prompt Input
+    user_prompt = st.text_input("AI ko kya instruct karna hai?", placeholder="e.g. Cartoon me convert kro / Describe this photo")
 
-    if generate_btn and user_input:
-        if keys_configured:
-            generated_img, error_msg = generate_fresh_image(user_input)
-            
-            if generated_img:
-                result_container.image(generated_img, caption="AI Generated Image", use_container_width=True)
-                st.session_state['generated_image'] = generated_img
-            else:
-                error_container.error(error_msg)
+    # 3. Action Buttons
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        transform_btn = st.button("Transform & Enhance Photo 🚀", use_container_width=True)
+    with col_btn2:
+        analyze_btn = st.button("Analyze Photo (Gemini) 🔍", use_container_width=True)
+
+with col2:
+    st.subheader("🖼️ Output Result")
+    
+    # Image Transformation Logic
+    if transform_btn:
+        if not user_prompt:
+            st.warning("Kripya pehle prompt type karein!")
         else:
-            st.warning("⚠️ Please configure your API keys first.")
+            with st.spinner("Processing image generation..."):
+                try:
+                    # Direct reliable model call
+                    prompt_text = f"masterpiece, highly detailed, {user_prompt}"
+                    
+                    # Call Hugging Face Stable Diffusion
+                    img_bytes = hf_client.text_to_image(
+                        prompt_text, 
+                        model="stabilityai/stable-diffusion-2-1"
+                    )
+                    st.image(img_bytes, caption="Generated Result", use_container_width=True)
+                    st.success("Successfully generated via HuggingFace!")
+                
+                except Exception as e:
+                    # Fallback to Pollinations with proper prompt encoding if HF fails
+                    st.info("HF busy status. Switching to fast backup engine...")
+                    try:
+                        clean_prompt = user_prompt.replace(" ", "%20")
+                        pollin_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=800&height=800&nologo=true"
+                        st.image(pollin_url, caption="Generated Result (Backup Engine)", use_container_width=True)
+                    except Exception as err:
+                        st.error(f"Error: {err}")
 
-# --- Footer with Status ---
-if not keys_configured:
-    st.markdown("---")
-    st.warning("⚠️ Application is NOT fully functional. Please add your API keys (GEMINI_API_KEY and HF_TOKEN) to Streamlit Secrets.")
-else:
-    # Small status indicator
-    st.markdown("---")
-    st.caption("✔️ System is online using Hugging Face servers.")
+    # Gemini Vision Analysis Logic
+    if analyze_btn:
+        if not uploaded_file:
+            st.warning("Pehle ek photo upload karein!")
+        else:
+            with st.spinner("Analyzing image with Gemini..."):
+                try:
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = user_prompt if user_prompt else "Describe this image in detail in Hindi and English."
+                    response = model.generate_content([prompt, Image.open(uploaded_file)])
+                    st.write(response.text)
+                except Exception as e:
+                    st.error(f"Gemini Error: {e}")
