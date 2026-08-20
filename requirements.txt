@@ -1,4 +1,5 @@
 streamlit
 requests
-fal-client
+Pillow
 google-generativeai
+huggingface_hub
