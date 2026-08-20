@@ -1,3 +1,4 @@
 streamlit
+requests
 fal-client
-huggingface_hub
+google-generativeai
