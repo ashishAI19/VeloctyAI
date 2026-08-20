@@ -3,3 +3,5 @@ requests
 Pillow
 google-generativeai
 huggingface_hub
+gTTS==2.5.1
+streamlit-mic-recorder==0.0.8
