@@ -1,5 +1,4 @@
 import base64
-from gTTS import gTTS
 from streamlit_mic_recorder import speech_to_text
 import os
 import io
@@ -22,20 +21,17 @@ mode = st.sidebar.radio(
         "🎬 Free AI Video"
     ]
 )
-# 1. AI CHAT WITH AUTO-VOICE RESPONSE
+# 1. AI CHAT WITH BROWSER NATIVE VOICE (NO HEAVY LIBRARIES NEEDED)
 if mode == "💬 Fast AI Search & Chat":
-    st.subheader("💬 VeloctyAI Voice Assistant")
+    st.subheader("💬 VeloctyAI Assistant")
     
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-    # Mic Input
-    st.write("🎙️ **Bol kar sawal poochein:**")
-    voice_prompt = speech_to_text(language='hi', start_prompt="Listening... (Bolna shuru karein)", stop_prompt="Stop Recording", key='STT')
+    with st.form("chat_form"):
+        user_query = st.text_input("Apna sawal likhein:")
+        submit_chat = st.form_submit_button("Ask Assistant 🚀")
 
-    # Text Input
-    user_query = st.text_input("Ya likh kar sawal poochein:", value=voice_prompt if voice_prompt else "")
-
-    if st.button("Ask Assistant 🚀") and user_query:
+    if submit_chat and user_query:
         if not gemini_key:
             st.error("GEMINI_API_KEY set nahi hai!")
         else:
@@ -46,27 +42,23 @@ if mode == "💬 Fast AI Search & Chat":
                     model = genai.GenerativeModel("gemini-1.5-flash")
                     response = model.generate_content(user_query)
                     
-                    # 1. Text Jawab Dikhayein
+                    # 1. Text Jawab
                     st.success("Answer:")
                     st.write(response.text)
 
-                    # 2. Audio Generate & Auto-Play (AI Bolega)
-                    tts = gTTS(text=response.text, lang='hi')
-                    audio_fp = io.BytesIO()
-                    tts.write_to_fp(audio_fp)
-                    audio_bytes = audio_fp.getvalue()
-                    
-                    b64 = base64.b64encode(audio_bytes).decode()
-                    md = f"""
-                        <audio autoplay style="display:none;">
-                        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-                        </audio>
-                        """
-                    st.markdown(md, unsafe_allow_html=True)
+                    # 2. Browser Web Speech API (Auto-speak without gTTS)
+                    clean_text = response.text.replace('"', "'").replace('\n', ' ')
+                    js_speech = f"""
+                        <script>
+                            var msg = new SpeechSynthesisUtterance("{clean_text}");
+                            msg.lang = "hi-IN";
+                            window.speechSynthesis.speak(msg);
+                        </script>
+                    """
+                    st.components.v1.html(js_speech, height=0)
 
                 except Exception as e:
                     st.error(f"Error: {e}")
-
 # 2. PHOTO TRANSFORM + PROMPT EDIT + DOWNLOAD
 elif mode == "✨ AI Style Transform & Edit":
     st.subheader("✨ Custom Photo Editor & Transformer")
