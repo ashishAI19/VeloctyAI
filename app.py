@@ -36,7 +36,7 @@ if mode == "💬 Fast AI Search & Chat":
             with st.spinner("Jawab aa raha hai..."):
                 try:
                     # Model configuration for instant responses
-                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-3.6-flash")
                     response = model.generate_content(user_query)
                     st.success("Answer:")
                     st.write(response.text)
