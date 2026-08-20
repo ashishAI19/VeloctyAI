@@ -1,3 +1,6 @@
+import base64
+from gTTS import gTTS
+from streamlit_mic_recorder import speech_to_text
 import os
 import io
 import requests
@@ -19,30 +22,48 @@ mode = st.sidebar.radio(
         "🎬 Free AI Video"
     ]
 )
-
-# 1. AI CHAT
+# 1. AI CHAT WITH AUTO-VOICE RESPONSE
 if mode == "💬 Fast AI Search & Chat":
-    st.subheader("💬 VeloctyAI UltraFast Assistant")
-    st.caption("Hindi ya English me sawal likhein — instant answer paayein!")
-
+    st.subheader("💬 VeloctyAI Voice Assistant")
+    
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-    with st.form("chat_form"):
-        user_query = st.text_input("Apna sawal likhein:")
-        submit_chat = st.form_submit_button("Ask Assistant 🚀")
+    # Mic Input
+    st.write("🎙️ **Bol kar sawal poochein:**")
+    voice_prompt = speech_to_text(language='hi', start_prompt="Listening... (Bolna shuru karein)", stop_prompt="Stop Recording", key='STT')
 
-    if submit_chat and user_query:
+    # Text Input
+    user_query = st.text_input("Ya likh kar sawal poochein:", value=voice_prompt if voice_prompt else "")
+
+    if st.button("Ask Assistant 🚀") and user_query:
         if not gemini_key:
-            st.error("GEMINI_API_KEY set nahi hai! Streamlit Secrets me key add karein.")
+            st.error("GEMINI_API_KEY set nahi hai!")
         else:
             with st.spinner("Jawab aa raha hai..."):
                 try:
                     import google.generativeai as genai
                     genai.configure(api_key=gemini_key)
-                    model = genai.GenerativeModel("gemini-3.6-flash")
+                    model = genai.GenerativeModel("gemini-1.5-flash")
                     response = model.generate_content(user_query)
+                    
+                    # 1. Text Jawab Dikhayein
                     st.success("Answer:")
                     st.write(response.text)
+
+                    # 2. Audio Generate & Auto-Play (AI Bolega)
+                    tts = gTTS(text=response.text, lang='hi')
+                    audio_fp = io.BytesIO()
+                    tts.write_to_fp(audio_fp)
+                    audio_bytes = audio_fp.getvalue()
+                    
+                    b64 = base64.b64encode(audio_bytes).decode()
+                    md = f"""
+                        <audio autoplay style="display:none;">
+                        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+                        </audio>
+                        """
+                    st.markdown(md, unsafe_allow_html=True)
+
                 except Exception as e:
                     st.error(f"Error: {e}")
 
